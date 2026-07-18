@@ -43,6 +43,7 @@
           };
 
           dontUnpack = true;
+          dontStrip = true;
           strictDeps = true;
 
           nativeBuildInputs = [
