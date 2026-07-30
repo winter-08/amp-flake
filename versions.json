@@ -1,21 +1,21 @@
 {
-  "version": "0.0.1785342457-g1011d5",
+  "version": "0.0.1785370680-g640172",
   "platforms": {
     "aarch64-darwin": {
       "target": "darwin-arm64",
-      "hash": "sha256-JYYLs8zI/8P+yQ20e4IjJhTddxvYJ9tR5VY3YV4Tzak="
+      "hash": "sha256-LBaMSl0ippw46KcnARlpigMFC6qqvXBy//K+Qs/kzAc="
     },
     "aarch64-linux": {
       "target": "linux-arm64",
-      "hash": "sha256-VejUSykr0ZB8BKuLcs8o8cYOdsopq/afbvDNa2tun98="
+      "hash": "sha256-G8sKPSZwUCxLTAKqAcFv2jyuQ4xnEwebdwrT5FBVfUc="
     },
     "x86_64-darwin": {
       "target": "darwin-x64",
-      "hash": "sha256-ZGxNeaS5TJsuPpdDwUIo4THCeMn0t6dPQ7EWQWriNZs="
+      "hash": "sha256-kUNlFTmtZujrG2v+zB6yRVYu4ZLxXmKimkDo/uvVIUQ="
     },
     "x86_64-linux": {
       "target": "linux-x64-baseline",
-      "hash": "sha256-edbqYOl5wgtD2DBrAGGB0pa5/fRKJ6Tj9k9KD4RKotk="
+      "hash": "sha256-qE2JRgLmZ08BFRTRqsWcSKvSmaIPvV9Qn2MhOMdZca8="
     }
   }
 }
