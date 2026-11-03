@@ -27,6 +27,9 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Test desktop updater
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+
       - name: Evaluate every supported system
         run: nix flake check --all-systems --no-build
 

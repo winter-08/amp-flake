@@ -1,0 +1,67 @@
+name: Update Amp desktop
+
+on:
+  schedule:
+    # Independent of the CLI updater, offset by 30 minutes.
+    - cron: "47 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-amp-desktop
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update and validate desktop
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Test updater and check desktop releases
+        id: update
+        run: |
+          python3 -m unittest discover -s tests -p 'test_*.py'
+          python3 scripts/update-desktop.py
+          if git diff --quiet -- desktop-versions.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate update
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          nix flake check --all-systems --no-build
+          nix build .#checks.x86_64-linux.desktop .#checks.x86_64-linux.hjem .#checks.x86_64-linux.repository --no-link
+          nix build .#amp-desktop --out-link result-desktop
+          test -x result-desktop/bin/amp-desktop
+          test -f result-desktop/share/applications/amp-desktop.desktop
+          grep -F 'x-scheme-handler/com.ampcode.amp.linux.auth' result-desktop/share/applications/amp-desktop.desktop
+          ELECTRON_RUN_AS_NODE=1 result-desktop/bin/amp-desktop --version
+
+      - name: Commit validated desktop pins
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          linux_version="$(jq --raw-output '.platforms["x86_64-linux"].version' desktop-versions.json)"
+          mac_version="$(jq --raw-output '.platforms["aarch64-darwin"].version' desktop-versions.json)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add desktop-versions.json
+          git commit -m "Update Amp desktop (Linux $linux_version, macOS $mac_version)"
+          # A concurrent main update makes this fail safely; the next scheduled
+          # run retries from the new main instead of overwriting anyone's work.
+          git push origin HEAD:main

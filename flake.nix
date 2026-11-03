@@ -133,6 +133,7 @@
                 pkgs.actionlint
                 pkgs.jq
                 pkgs.shellcheck
+                pkgs.python3
               ];
             }
             ''
@@ -146,8 +147,17 @@
                 ]) and
                 ([.platforms[].hash | startswith("sha256-")] | all)
               ' ${./versions.json} >/dev/null
-              actionlint -shellcheck=shellcheck ${./.github/workflows/check.yml} ${./.github/workflows/update-amp.yml}
+              actionlint -shellcheck=shellcheck ${./.github/workflows/check.yml} ${./.github/workflows/update-amp.yml} ${./.github/workflows/update-desktop.yml}
               shellcheck ${./scripts/update.sh}
+              cp -r ${./scripts} scripts
+              cp -r ${./tests} tests
+              python3 -m unittest discover -s tests -p 'test_*.py'
+              jq --exit-status '
+                (.platforms | keys == ["aarch64-darwin", "aarch64-linux", "x86_64-linux"]) and
+                ([.platforms[] | (.version | type == "string" and length > 0) and
+                  (.url | startswith("https://static.ampcode.com/")) and
+                  (.hash | startswith("sha256-"))] | all)
+              ' ${./desktop-versions.json} >/dev/null
               touch "$out"
             '';
       } // pkgs.lib.optionalAttrs (builtins.elem pkgs.stdenv.hostPlatform.system desktopSystems) {
@@ -160,6 +170,7 @@
             pkgs.curl
             pkgs.jq
             pkgs.nixfmt
+            pkgs.python3
             pkgs.shellcheck
           ];
         };

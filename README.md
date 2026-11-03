@@ -72,8 +72,8 @@ the official versioned `.deb` downloads, and macOS uses the official versioned
 DMG from [Amp's Homebrew cask](https://github.com/ampcode/homebrew-tap/blob/main/Casks/amp%40beta.rb).
 The Linux version/checksums come from the
 [upstream-maintained AUR package](https://aur.archlinux.org/packages/amp-desktop-bin).
-Desktop updates are currently **manual**, independent of the CLI update job.
-Update the platform's version, URL, and SHA-256 together and run the checks.
+Desktop updates are automated independently of the CLI update job, as described
+below. Each platform keeps its own version and checksum.
 Do not use the app's self-updater to modify immutable Nix store installations;
 update this flake input and rebuild instead.
 
@@ -145,6 +145,47 @@ Run the same updater locally with:
 ```console
 nix develop --command ./scripts/update.sh
 ```
+
+### Desktop updates
+
+[The desktop update workflow](.github/workflows/update-desktop.yml) checks every
+six hours, offset by 30 minutes from the CLI workflow. It also supports manual
+workflow dispatch on `main`. The existing CLI workflow is unchanged.
+
+The [desktop updater](scripts/update-desktop.py) parses literal versions and
+SHA-256 checksums from Amp's Linux AUR metadata and official macOS Homebrew cask.
+It never executes the upstream PKGBUILD or Ruby code. Unchanged runs download
+only those two small metadata files. For changed releases, it downloads just
+the changed platform artifacts, checks every hash, and atomically updates
+`desktop-versions.json`. A failed download/hash check leaves all pins unchanged.
+Downgrades, modified checksums for an existing version, malformed metadata, and
+changes to the cask's architecture/minimum macOS contract fail for review.
+
+Before committing desktop pins to `main`, CI runs updater tests, evaluates all
+systems, builds the x86_64 Linux desktop, checks its launcher and callback entry,
+and smoke-tests Electron headlessly. macOS and ARM Linux artifacts have verified
+hashes and evaluated derivations but are not built or GUI-tested by this job.
+A concurrent push to `main` fails safely and is retried at the next scheduled run.
+Desktop workflow failures do not block the independent CLI updater.
+
+The workflow begins scheduling only after it is merged to the default branch.
+It updates this package repository, not your machines: update your consuming
+flake lock and rebuild to install the new version.
+
+Run locally with:
+
+```console
+nix develop --command python3 scripts/update-desktop.py
+```
+
+### Theme configuration
+
+No additional Nix theme setting is required. The current CLI does not support
+custom themes ([removed in Amp Neo](https://ampcode.com/news/neo)); do not add an
+`amp.theme` key. Desktop appearance is controlled by the app and operating system,
+not the CLI settings JSON. On Linux, the app follows the system appearance and
+can pick up an existing Omarchy palette when its appearance is set to System.
+This module deliberately leaves desktop UI state writable and unmanaged.
 
 ## Licensing
 
