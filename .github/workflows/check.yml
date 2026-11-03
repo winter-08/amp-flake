@@ -37,7 +37,7 @@ jobs:
 
       - name: Build desktop and module checks
         run: |
-          nix build .#checks.x86_64-linux.desktop .#checks.x86_64-linux.home-manager .#checks.x86_64-linux.repository --no-link
+          nix build .#checks.x86_64-linux.desktop .#checks.x86_64-linux.hjem .#checks.x86_64-linux.repository --no-link
           nix build .#amp-desktop --out-link result-desktop
           test -x result-desktop/bin/amp-desktop
           test -f result-desktop/share/applications/amp-desktop.desktop

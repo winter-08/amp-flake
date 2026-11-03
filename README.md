@@ -54,8 +54,7 @@ Desktop supports `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`.
 There is no upstream Intel macOS desktop build. The native macOS app requires
 **macOS 26 Tahoe or later**, independently of Nix's supported host platforms.
 On macOS the package installs `Applications/Amp.app` and an `amp-desktop`
-launcher. Home Manager's normal application integration can expose the app to
-Finder. On Linux the package preserves the upstream desktop entry, icons, and
+launcher. Your nix-darwin application integration can expose the app to Finder. On Linux the package preserves the upstream desktop entry, icons, and
 sign-in callback URL scheme. The host must support Chromium's user-namespace
 sandbox; this package does not disable the sandbox.
 
@@ -78,16 +77,16 @@ Update the platform's version, URL, and SHA-256 together and run the checks.
 Do not use the app's self-updater to modify immutable Nix store installations;
 update this flake input and rebuild instead.
 
-## Declarative configuration with Home Manager
+## Declarative configuration with Hjem
 
-Add this flake as `inputs.amp`, then import its module in your Home Manager
-configuration. No overlay is required for the module's default packages:
+Add this flake as `inputs.amp`, then import its Hjem user module through
+`hjem.extraModules` in your existing NixOS or nix-darwin configuration:
 
 ```nix
 { inputs, ... }: {
-  imports = [ inputs.amp.homeManagerModules.default ];
-
-  programs.amp = {
+  # Import Hjem's own platform module as usual, if not already configured.
+  hjem.extraModules = [ inputs.amp.hjemModules.default ];
+  hjem.users.yourUsername.programs.amp = {
     enable = true; # CLI, also used by the native macOS app's local runner
     desktop.enable = true; # independent: can be enabled without the CLI
     settings = {
@@ -100,7 +99,11 @@ configuration. No overlay is required for the module's default packages:
 }
 ```
 
-Pass `inputs` through `extraSpecialArgs` if using that example's argument.
+Replace `yourUsername` with your configured Hjem user. Pass `inputs` through
+your system's `specialArgs` if using that example's argument. The module exports
+`hjemModules.default` (also `hjemModules.amp`) and uses Hjem's native `packages`
+and `files` options; it does not depend on Home Manager.
+
 `programs.amp.package` and `programs.amp.desktop.package` can override packages.
 A nonempty `programs.amp.settings` writes `~/.config/amp/settings.json` on both
 Linux and macOS. This is the documented [CLI settings](https://ampcode.com/docs/cli/settings)
@@ -110,8 +113,9 @@ shell's PATH. These settings do not configure cloud orbs or the Linux desktop
 web shell. Desktop appearance and notification controls remain in the app.
 
 When managed, edit the Nix configuration and rebuild instead of using
-`amp config edit`. Home Manager will refuse to overwrite an existing settings
-file without a backup/migration; preserve its contents in `settings` first.
+`amp config edit`. Back up and migrate any existing settings file into `settings` before
+activation. Hjem's file-conflict behavior follows your existing clobber policy;
+this module does not enable clobbering.
 An empty settings attribute set leaves the existing file alone. Authentication,
 workspace state, browser storage, and desktop UI preferences remain writable
 and are not managed by this module.

@@ -80,8 +80,8 @@
         };
     in
     {
-      homeManagerModules.default = import ./modules/home-manager.nix { inherit self; };
-      homeManagerModules.amp = self.homeManagerModules.default;
+      hjemModules.default = import ./modules/hjem.nix { inherit self; };
+      hjemModules.amp = self.hjemModules.default;
 
       overlays.default = final: _prev: {
         amp = mkAmp final;
@@ -124,7 +124,7 @@
       );
 
       checks = forAllSystems (pkgs: {
-        home-manager = import ./tests/home-manager.nix { inherit pkgs self; };
+        hjem = import ./tests/hjem.nix { inherit pkgs self; };
         package = self.packages.${pkgs.stdenv.hostPlatform.system}.amp;
         repository =
           pkgs.runCommand "amp-flake-checks"
