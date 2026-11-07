@@ -1,0 +1,19 @@
+{
+  "platforms": {
+    "x86_64-linux": {
+      "version": "0.1.29894161",
+      "url": "https://static.ampcode.com/linux/0.1.29894161/amp-desktop-0.1.29894161-amd64.deb",
+      "hash": "sha256-mfMEkkgHqHJGUt33vkbSNuGDcedX4VW9qLN+w5IBz3U="
+    },
+    "aarch64-linux": {
+      "version": "0.1.29894161",
+      "url": "https://static.ampcode.com/linux/0.1.29894161/amp-desktop-0.1.29894161-arm64.deb",
+      "hash": "sha256-/73qCxsM60MXLSdQyhjdO2B6oCibXGpFZzAEWY+4f9A="
+    },
+    "aarch64-darwin": {
+      "version": "1.0-1088",
+      "url": "https://static.ampcode.com/mac/Amp-1.0-1088.dmg",
+      "hash": "sha256-Fc0jKj2hdsEi3RylxpU9lzXFxkbBsYLB/J6AD0zKoeE="
+    }
+  }
+}
