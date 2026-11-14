@@ -1,7 +1,8 @@
 # amp-flake
 
 A reproducible, automatically updated Nix flake for [Amp](https://ampcode.com),
-the coding agent for terminals and editors.
+the coding agent for terminals, editors, and desktop. The default package remains
+the CLI; the desktop app is available separately as `amp-desktop`.
 
 ## Run Amp
 
@@ -42,6 +43,88 @@ self-updater.
 - `aarch64-linux`
 - `x86_64-linux` (uses Amp's baseline build for compatibility)
 
+## Desktop app
+
+```console
+nix run github:winter-08/amp-flake#amp-desktop
+nix profile install github:winter-08/amp-flake#amp-desktop
+```
+
+Desktop supports `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`.
+There is no upstream Intel macOS desktop build. The native macOS app requires
+**macOS 26 Tahoe or later**, independently of Nix's supported host platforms.
+On macOS the package installs `Applications/Amp.app` and an `amp-desktop`
+launcher. Your nix-darwin application integration can expose the app to Finder. On Linux the package preserves the upstream desktop entry, icons, and
+sign-in callback URL scheme. The host must support Chromium's user-namespace
+sandbox; this package does not disable the sandbox.
+
+Both packages are available in `overlays.default`. For overlay use, allow both
+`amp` and `amp-desktop` in your unfree predicate. For example:
+
+```nix
+nixpkgs.config.allowUnfreePredicate = pkg:
+  builtins.elem (nixpkgs.lib.getName pkg) [ "amp" "amp-desktop" ];
+environment.systemPackages = [ pkgs.amp pkgs.amp-desktop ];
+```
+
+Desktop releases are pinned separately in `desktop-versions.json`: Linux uses
+the official versioned `.deb` downloads, and macOS uses the official versioned
+DMG from [Amp's Homebrew cask](https://github.com/ampcode/homebrew-tap/blob/main/Casks/amp%40beta.rb).
+The Linux version/checksums come from the
+[upstream-maintained AUR package](https://aur.archlinux.org/packages/amp-desktop-bin).
+Desktop updates are automated independently of the CLI update job, as described
+below. Each platform keeps its own version and checksum.
+Do not use the app's self-updater to modify immutable Nix store installations;
+update this flake input and rebuild instead.
+
+## Declarative configuration with Hjem
+
+Add this flake as `inputs.amp`, then import its Hjem user module through
+`hjem.extraModules` in your existing NixOS or nix-darwin configuration:
+
+```nix
+{ inputs, ... }: {
+  # Import Hjem's own platform module as usual, if not already configured.
+  hjem.extraModules = [ inputs.amp.hjemModules.default ];
+  hjem.users.yourUsername.programs.amp = {
+    enable = true; # CLI, also used by the native macOS app's local runner
+    desktop.enable = true; # independent: can be enabled without the CLI
+    settings = {
+      "amp.notifications.enabled" = true;
+      "amp.permissions" = [
+        { tool = "Bash"; matches = { cmd = "git push*"; }; action = "ask"; }
+      ];
+    };
+  };
+}
+```
+
+Replace `yourUsername` with your configured Hjem user. Pass `inputs` through
+your system's `specialArgs` if using that example's argument. The module exports
+`hjemModules.default` (also `hjemModules.amp`) and uses Hjem's native `packages`
+and `files` options; it does not depend on Home Manager.
+
+`programs.amp.package` and `programs.amp.desktop.package` can override packages.
+A nonempty `programs.amp.settings` writes `~/.config/amp/settings.json` on both
+Linux and macOS. This is the documented [CLI settings](https://ampcode.com/docs/cli/settings)
+file, not desktop UI preferences. The [native macOS local runner](https://ampcode.com/docs/apps/mac/runner)
+uses the installed CLI and its settings/sign-in; ensure `amp` is on your login
+shell's PATH. These settings do not configure cloud orbs or the Linux desktop
+web shell. Desktop appearance and notification controls remain in the app.
+
+When managed, edit the Nix configuration and rebuild instead of using
+`amp config edit`. Back up and migrate any existing settings file into `settings` before
+activation. Hjem's file-conflict behavior follows your existing clobber policy;
+this module does not enable clobbering.
+An empty settings attribute set leaves the existing file alone. Authentication,
+workspace state, browser storage, and desktop UI preferences remain writable
+and are not managed by this module.
+
+**Never put credentials or API keys in `settings`: generated files are in the
+world-readable Nix store.** Sign in normally; the separate CLI credentials at
+`~/.local/share/amp/secrets.json` are not managed. Settings must be enabled with
+`programs.amp.enable`; enabling only the desktop installs just the desktop app.
+
 ## Automatic updates
 
 [The update workflow](.github/workflows/update-amp.yml) checks Amp's official
@@ -62,6 +145,47 @@ Run the same updater locally with:
 ```console
 nix develop --command ./scripts/update.sh
 ```
+
+### Desktop updates
+
+[The desktop update workflow](.github/workflows/update-desktop.yml) checks every
+six hours, offset by 30 minutes from the CLI workflow. It also supports manual
+workflow dispatch on `main`. The existing CLI workflow is unchanged.
+
+The [desktop updater](scripts/update-desktop.py) parses literal versions and
+SHA-256 checksums from Amp's Linux AUR metadata and official macOS Homebrew cask.
+It never executes the upstream PKGBUILD or Ruby code. Unchanged runs download
+only those two small metadata files. For changed releases, it downloads just
+the changed platform artifacts, checks every hash, and atomically updates
+`desktop-versions.json`. A failed download/hash check leaves all pins unchanged.
+Downgrades, modified checksums for an existing version, malformed metadata, and
+changes to the cask's architecture/minimum macOS contract fail for review.
+
+Before committing desktop pins to `main`, CI runs updater tests, evaluates all
+systems, builds the x86_64 Linux desktop, checks its launcher and callback entry,
+and smoke-tests Electron headlessly. macOS and ARM Linux artifacts have verified
+hashes and evaluated derivations but are not built or GUI-tested by this job.
+A concurrent push to `main` fails safely and is retried at the next scheduled run.
+Desktop workflow failures do not block the independent CLI updater.
+
+The workflow begins scheduling only after it is merged to the default branch.
+It updates this package repository, not your machines: update your consuming
+flake lock and rebuild to install the new version.
+
+Run locally with:
+
+```console
+nix develop --command python3 scripts/update-desktop.py
+```
+
+### Theme configuration
+
+No additional Nix theme setting is required. The current CLI does not support
+custom themes ([removed in Amp Neo](https://ampcode.com/news/neo)); do not add an
+`amp.theme` key. Desktop appearance is controlled by the app and operating system,
+not the CLI settings JSON. On Linux, the app follows the system appearance and
+can pick up an existing Omarchy palette when its appearance is set to System.
+This module deliberately leaves desktop UI state writable and unmanaged.
 
 ## Licensing
 

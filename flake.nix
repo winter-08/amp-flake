@@ -16,6 +16,9 @@
     }:
     let
       release = builtins.fromJSON (builtins.readFile ./versions.json);
+      desktopRelease = builtins.fromJSON (builtins.readFile ./desktop-versions.json);
+      desktopSystems = builtins.attrNames desktopRelease.platforms;
+      mkDesktop = pkgs: import ./pkgs/desktop.nix { inherit pkgs; release = desktopRelease; };
       supportedSystems = builtins.attrNames release.platforms;
       nixpkgsFor = system: if system == "x86_64-darwin" then nixpkgs-darwin else nixpkgs;
       pkgsFor =
@@ -24,7 +27,7 @@
           inherit system;
           # Amp is proprietary. This keeps direct flake usage self-contained;
           # overlay consumers should allow the `amp` package themselves.
-          config.allowUnfreePredicate = package: nixpkgs.lib.getName package == "amp";
+          config.allowUnfreePredicate = package: builtins.elem (nixpkgs.lib.getName package) [ "amp" "amp-desktop" ];
         };
       forAllSystems = function: nixpkgs.lib.genAttrs supportedSystems (system: function (pkgsFor system));
 
@@ -77,8 +80,13 @@
         };
     in
     {
+      hjemModules.default = import ./modules/hjem.nix { inherit self; };
+      hjemModules.amp = self.hjemModules.default;
+
       overlays.default = final: _prev: {
         amp = mkAmp final;
+      } // nixpkgs.lib.optionalAttrs (builtins.elem final.stdenv.hostPlatform.system desktopSystems) {
+        amp-desktop = mkDesktop final;
       };
 
       packages = forAllSystems (
@@ -89,6 +97,8 @@
         {
           inherit amp;
           default = amp;
+        } // pkgs.lib.optionalAttrs (builtins.elem pkgs.stdenv.hostPlatform.system desktopSystems) {
+          amp-desktop = mkDesktop pkgs;
         }
       );
 
@@ -104,10 +114,17 @@
             meta.description = "Run the Amp coding agent";
           };
           default = self.apps.${system}.amp;
+        } // pkgs.lib.optionalAttrs (builtins.elem system desktopSystems) {
+          amp-desktop = {
+            type = "app";
+            program = "${self.packages.${system}.amp-desktop}/bin/amp-desktop";
+            meta.description = "Run the Amp desktop app";
+          };
         }
       );
 
       checks = forAllSystems (pkgs: {
+        hjem = import ./tests/hjem.nix { inherit pkgs self; };
         package = self.packages.${pkgs.stdenv.hostPlatform.system}.amp;
         repository =
           pkgs.runCommand "amp-flake-checks"
@@ -116,6 +133,7 @@
                 pkgs.actionlint
                 pkgs.jq
                 pkgs.shellcheck
+                pkgs.python3
               ];
             }
             ''
@@ -129,10 +147,21 @@
                 ]) and
                 ([.platforms[].hash | startswith("sha256-")] | all)
               ' ${./versions.json} >/dev/null
-              actionlint -shellcheck=shellcheck ${./.github/workflows/check.yml} ${./.github/workflows/update-amp.yml}
+              actionlint -shellcheck=shellcheck ${./.github/workflows/check.yml} ${./.github/workflows/update-amp.yml} ${./.github/workflows/update-desktop.yml}
               shellcheck ${./scripts/update.sh}
+              cp -r ${./scripts} scripts
+              cp -r ${./tests} tests
+              python3 -m unittest discover -s tests -p 'test_*.py'
+              jq --exit-status '
+                (.platforms | keys == ["aarch64-darwin", "aarch64-linux", "x86_64-linux"]) and
+                ([.platforms[] | (.version | type == "string" and length > 0) and
+                  (.url | startswith("https://static.ampcode.com/")) and
+                  (.hash | startswith("sha256-"))] | all)
+              ' ${./desktop-versions.json} >/dev/null
               touch "$out"
             '';
+      } // pkgs.lib.optionalAttrs (builtins.elem pkgs.stdenv.hostPlatform.system desktopSystems) {
+        desktop = self.packages.${pkgs.stdenv.hostPlatform.system}.amp-desktop;
       });
 
       devShells = forAllSystems (pkgs: {
@@ -141,6 +170,7 @@
             pkgs.curl
             pkgs.jq
             pkgs.nixfmt
+            pkgs.python3
             pkgs.shellcheck
           ];
         };
