@@ -27,6 +27,9 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Test desktop updater
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+
       - name: Evaluate every supported system
         run: nix flake check --all-systems --no-build
 
@@ -34,3 +37,13 @@ jobs:
         run: |
           nix build .#packages.x86_64-linux.default
           timeout 10 ./result/bin/amp --version
+
+      - name: Build desktop and module checks
+        run: |
+          nix build .#checks.x86_64-linux.desktop .#checks.x86_64-linux.hjem .#checks.x86_64-linux.repository --no-link
+          nix build .#amp-desktop --out-link result-desktop
+          test -x result-desktop/bin/amp-desktop
+          test -f result-desktop/share/applications/amp-desktop.desktop
+          grep -F 'x-scheme-handler/com.ampcode.amp.linux.auth' result-desktop/share/applications/amp-desktop.desktop
+          # Exercise the patched Electron runtime without a display or user data.
+          ELECTRON_RUN_AS_NODE=1 result-desktop/bin/amp-desktop --version
